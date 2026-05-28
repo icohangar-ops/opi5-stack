@@ -1,0 +1,81 @@
+services:
+  # ── Speech-to-Text (Whisper) ───────────────────────────────────────
+  wyoming-whisper:
+    container_name: wyoming-whisper
+    image: rhasspy/wyoming-whisper:latest
+    restart: unless-stopped
+    ports:
+      - "10300:10300"           # Wyoming protocol port
+    volumes:
+      - /mnt/nvme/models/whisper:/data
+      - /mnt/nvme/cache/whisper:/tmp/whisper
+    command:
+      - --model
+      - "base"                  # base=74MB, small=466MB, tiny=39MB
+      - --language
+      - "en"
+      - --beam-size
+      - "5"
+      - --local-files-only      # don't re-download; copy .pt/.bin to /data
+    environment:
+      # Whisper runs on CPU; pin to the 4×A76 cores.
+      OMP_NUM_THREADS: "4"
+    cpuset: "4-7"
+    # RK3588: tiny=realtime, base=realtime, small=~0.8x
+
+  # ── Text-to-Speech (Piper) ─────────────────────────────────────────
+  wyoming-piper:
+    container_name: wyoming-piper
+    image: rhasspy/wyoming-piper:latest
+    restart: unless-stopped
+    ports:
+      - "10200:10200"
+    volumes:
+      - /mnt/nvme/models/piper:/data:ro
+    command:
+      - --voice
+      - "en_US-lessac-medium"
+      - --uri
+      - "tcp://0.0.0.0:10200"
+      - --max-speakers
+      - "1"
+    # Piper is extremely fast even on A55; no cpuset needed.
+
+  # ── Wake Word (openWakeWord) ───────────────────────────────────────
+  wyoming-openwakeword:
+    container_name: wyoming-openwakeword
+    image: rhasspy/wyoming-openwakeword:latest
+    restart: unless-stopped
+    ports:
+      - "10400:10400"
+    volumes:
+      - /mnt/nvme/models/openwakeword:/data
+    command:
+      - --model
+      - "hey_jarvis_v0.1"
+      - --uri
+      - "tcp://0.0.0.0:10400"
+      - --threshold
+      - "0.5"
+    # Optional: add custom .tflite models in /data
+
+  # ── Wyoming Satellites (satellite speakers/mics) ────────────────────
+  # Uncomment and deploy on Pi Zero 2W / other room Pis if desired.
+  # wyoming-satellite:
+  #   image: rhasspy/wyoming-satellite:latest
+  #   restart: unless-stopped
+  #   devices:
+  #     - /dev/snd:/dev/snd
+  #   command:
+  #     - --name
+  #     - "living_room"
+  #     - --mic-command
+  #     - "arecord -D plughw:1,0 -r 16000 -c 1 -f S16_LE -t raw"
+  #     - --snd-command
+  #     - "aplay -D plughw:1,0 -r 22050 -c 1 -f S16_LE -t raw"
+  #     - --wake-uri
+  #     - "tcp://<pi-ip>:10400"
+  #     - --wake-word-name
+  #     - "hey_jarvis_v0.1"
+  #     - --event-uri
+  #     - "tcp://<pi-ip>:10500"

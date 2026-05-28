@@ -1,0 +1,24 @@
+services:
+  ollama:
+    container_name: ollama
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    ports:
+      - "11434:11434"          # native + OpenAI-compatible API on /v1
+    volumes:
+      - /mnt/nvme/ollama:/root/.ollama
+    environment:
+      # RK3588 has 8 cores (4×A76 + 4×A55). Pin to the big cores for latency.
+      OLLAMA_NUM_PARALLEL: "1"
+      OLLAMA_MAX_LOADED_MODELS: "1"
+      OLLAMA_KEEP_ALIVE: "30m"
+      # Optional: cap threads to the 4 A76 cores
+      OLLAMA_NUM_THREADS: "4"
+    # Pin to performance cores (cpuset is core ids; A76 are usually 4-7 on RK3588)
+    cpuset: "4-7"
+
+# Recommended models for 8 GB / 16 GB:
+#   ollama pull qwen2.5:3b-instruct-q4_K_M     # ~2 GB, smart + fast
+#   ollama pull llama3.2:3b-instruct-q4_K_M    # ~2 GB
+#   ollama pull phi3.5:3.8b-mini-instruct-q4_K_M
+#   ollama pull qwen2.5:7b-instruct-q4_K_M     # 16 GB only

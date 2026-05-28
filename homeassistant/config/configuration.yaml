@@ -1,0 +1,26 @@
+# Home Assistant base config — extend as needed.
+homeassistant:
+  packages: !include_dir_named packages
+
+default_config:
+
+http:
+  use_x_forwarded_for: true
+  trusted_proxies:
+    - 127.0.0.1
+    - ::1
+
+# MQTT broker (the mosquitto service in docker-compose)
+mqtt:
+  broker: 127.0.0.1
+  port: 1883
+  username: !secret mqtt_user
+  password: !secret mqtt_password
+  discovery: true
+
+# Frigate is added through the UI (Settings → Devices → Add Integration → Frigate),
+# pointing at http://127.0.0.1:5000 — the host-network HA container reaches it directly.
+
+automation: !include automations.yaml
+script:     !include_dir_merge_named scripts/
+scene:      !include scenes.yaml

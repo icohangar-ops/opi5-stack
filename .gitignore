@@ -1,0 +1,47 @@
+# Docker & local dev
+.env
+*.env
+.env.*
+!/.env.example
+
+# Model weights / binaries
+*.rknn
+*.rkllm
+*.onnx
+*.pt
+*.bin
+*.tflite
+models/*
+!models/.gitkeep
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+venv/
+
+# Frigate media (large)
+/media/
+frigate/media/
+
+# HA
+homeassistant/config/.storage/
+homeassistant/config/home-assistant.log
+homeassistant/config/home-assistant_v2.db*
+mosquitto/data/
+mosquitto/log/
+
+# Ollama model cache (large)
+ollama/models/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

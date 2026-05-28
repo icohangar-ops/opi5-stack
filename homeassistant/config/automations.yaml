@@ -1,0 +1,70 @@
+# Sample automations driven by Frigate MQTT events.
+# Frigate publishes to frigate/events with a JSON payload describing each
+# tracked object (camera, label, score, zones, etc.).
+
+- alias: "Doorbell — Person at door"
+  description: Notify phone + flash porch light when a person is detected.
+  mode: single
+  trigger:
+    - platform: mqtt
+      topic: frigate/events
+  condition:
+    - condition: template
+      value_template: >-
+        {{ trigger.payload_json['type'] in ['new','update']
+           and trigger.payload_json['after']['camera'] == 'doorbell'
+           and trigger.payload_json['after']['label'] == 'person'
+           and trigger.payload_json['after']['score'] > 0.75 }}
+  action:
+    - service: notify.mobile_app
+      data:
+        title: "Someone is at the door"
+        message: >-
+          {{ trigger.payload_json['after']['sub_label'] or 'Unknown person' }}
+          ({{ (trigger.payload_json['after']['score'] * 100) | round(0) }}%)
+        data:
+          image: >-
+            http://homeassistant.local:5000/api/events/{{ trigger.payload_json['after']['id'] }}/snapshot.jpg
+          tag: doorbell
+    - service: light.turn_on
+      target: { entity_id: light.porch }
+      data: { brightness_pct: 100, transition: 1 }
+
+- alias: "Driveway — Package delivered"
+  mode: single
+  trigger:
+    - platform: mqtt
+      topic: frigate/events
+  condition:
+    - condition: template
+      value_template: >-
+        {{ trigger.payload_json['type'] == 'end'
+           and trigger.payload_json['after']['camera'] == 'driveway'
+           and trigger.payload_json['after']['label'] == 'package' }}
+  action:
+    - service: notify.family
+      data:
+        title: "Package delivered"
+        message: "A package was left in the driveway."
+
+- alias: "Driveway — Unknown car at night"
+  mode: single
+  trigger:
+    - platform: mqtt
+      topic: frigate/events
+  condition:
+    - condition: template
+      value_template: >-
+        {{ trigger.payload_json['type'] == 'new'
+           and trigger.payload_json['after']['camera'] == 'driveway'
+           and trigger.payload_json['after']['label'] == 'car' }}
+    - condition: sun
+      after: sunset
+      before: sunrise
+  action:
+    - service: light.turn_on
+      target: { entity_id: light.driveway_floodlight }
+      data: { brightness_pct: 100 }
+    - delay: "00:05:00"
+    - service: light.turn_off
+      target: { entity_id: light.driveway_floodlight }

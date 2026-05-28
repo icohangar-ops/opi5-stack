@@ -1,0 +1,8 @@
+# Install on the Pi (aarch64). rknn-toolkit-lite2 is the on-device runtime.
+# Get the matching wheel from:
+#   https://github.com/airockchip/rknn-toolkit2/tree/master/rknn-toolkit-lite2/packages
+# Example:
+#   pip install rknn_toolkit_lite2-2.3.0-cp310-cp310-linux_aarch64.whl
+numpy>=1.24
+opencv-python-headless>=4.8
+Pillow>=10.0

@@ -1,0 +1,32 @@
+services:
+  frigate:
+    container_name: frigate
+    # Community RK3588 build of Frigate with rknn detector baked in.
+    # Track: https://github.com/MarcA711/frigate (or the official image once rknn lands upstream)
+    image: ghcr.io/marca711/frigate:stable-rk
+    restart: unless-stopped
+    privileged: true              # required for /dev/dri, /dev/dma_heap, NPU
+    shm_size: "256mb"             # bump if you run many cameras (~40 MB / cam)
+    devices:
+      - /dev/dri:/dev/dri         # Mali GPU (hwaccel decode)
+      - /dev/dma_heap:/dev/dma_heap
+      - /dev/rga:/dev/rga         # 2D engine for resize/colorspace
+      - /dev/mpp_service:/dev/mpp_service  # H.264/H.265 decoder
+      - /dev/rknpu:/dev/rknpu     # NPU
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ./config.yml:/config/config.yml:ro
+      - /mnt/nvme/frigate/media:/media/frigate
+      - type: tmpfs               # cache + 1-minute ring buffer in RAM
+        target: /tmp/cache
+        tmpfs:
+          size: 1000000000
+    ports:
+      - "5000:5000"   # Web UI
+      - "8554:8554"   # go2rtc RTSP
+      - "8555:8555/tcp"
+      - "8555:8555/udp"
+    env_file: .env
+    environment:
+      FRIGATE_RTSP_PASSWORD: "${FRIGATE_RTSP_PASSWORD}"
+      LIBVA_DRIVER_NAME: rockchip

@@ -1,0 +1,94 @@
+mqtt:
+  enabled: true
+  host: mqtt              # service name of the broker on the HA compose network
+  port: 1883
+  user: "{FRIGATE_MQTT_USER}"
+  password: "{FRIGATE_MQTT_PASSWORD}"
+
+# ───────────────────────── Detectors ─────────────────────────
+# Two NPU cores for detection, one left free for LLM / other models.
+detectors:
+  rknn_0:
+    type: rknn
+    num_cores: 1
+    core_mask: 0      # NPU core 0
+  rknn_1:
+    type: rknn
+    num_cores: 1
+    core_mask: 1      # NPU core 1
+
+model:
+  path: /config/model_cache/yolov8n-320x320.rknn   # auto-downloaded by image
+  model_type: yolo-generic
+  width: 320
+  height: 320
+  input_pixel_format: rgb
+  input_tensor: nhwc
+  labelmap_path: /labelmap/coco-80.txt
+
+# ───────────────────────── HW accel ─────────────────────────
+ffmpeg:
+  hwaccel_args: preset-rkmpp
+  output_args:
+    record: preset-record-generic-audio-aac
+
+# ───────────────────────── Defaults ─────────────────────────
+detect:
+  enabled: true
+  fps: 5
+  width: 1280
+  height: 720
+
+record:
+  enabled: true
+  retain: { days: 3, mode: motion }
+  alerts:    { retain: { days: 14, mode: motion } }
+  detections:{ retain: { days: 7,  mode: motion } }
+
+snapshots:
+  enabled: true
+  retain: { default: 7 }
+
+objects:
+  track: [person, car, dog, cat, package, bicycle]
+  filters:
+    person: { min_score: 0.6, threshold: 0.7 }
+    car:    { min_score: 0.5, threshold: 0.7 }
+
+# ───────────────────────── Cameras ─────────────────────────
+# Replace the inputs with your own RTSP URLs. The "sub" stream feeds
+# detection (low-res, low-CPU) and "main" feeds recording.
+cameras:
+  driveway:
+    enabled: true
+    ffmpeg:
+      inputs:
+        - path: rtsp://user:pass@192.168.1.50:554/Streaming/Channels/102
+          roles: [detect]
+        - path: rtsp://user:pass@192.168.1.50:554/Streaming/Channels/101
+          roles: [record]
+    detect: { width: 640, height: 360, fps: 5 }
+    objects:
+      track: [person, car, package]
+      filters:
+        car: { mask: 0,0,1,0,1,0.2,0,0.2 }   # ignore street at top
+
+  doorbell:
+    enabled: true
+    ffmpeg:
+      inputs:
+        - path: rtsp://user:pass@192.168.1.51:554/h264Preview_01_sub
+          roles: [detect, audio]
+        - path: rtsp://user:pass@192.168.1.51:554/h264Preview_01_main
+          roles: [record]
+    detect: { width: 640, height: 480, fps: 5 }
+    objects:
+      track: [person, package, cat, dog]
+
+# ───────────────────────── go2rtc (low-latency restream) ─────────────────────────
+go2rtc:
+  streams:
+    driveway:  [ rtsp://user:pass@192.168.1.50:554/Streaming/Channels/101 ]
+    doorbell:  [ rtsp://user:pass@192.168.1.51:554/h264Preview_01_main ]
+
+version: 0.14-0

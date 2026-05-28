@@ -1,0 +1,79 @@
+# Home Assistant LLM voice assistant package.
+#
+# Drop this file in homeassistant/config/packages/llm_assistant.yaml and add
+# `packages: !include_dir_named packages` under `homeassistant:` in
+# configuration.yaml. Then in the UI:
+#   1) HACS → install "Extended OpenAI Conversation"
+#   2) Add integration with:
+#        Base URL:  http://<pi-ip>:11434/v1   (ollama)
+#                or http://<pi-ip>:8080/v1    (rkllm)
+#        API Key:   not-needed
+#        Model:     qwen2.5:3b-instruct-q4_K_M  (or qwen2.5-3b for rkllm)
+#   3) In the integration's "Configure" panel paste `system_prompt` below
+#      and enable "Use Tools" (lets the model call HA services).
+#   4) Settings → Voice assistants → New assistant
+#        Conversation agent: Extended OpenAI Conversation
+#        Speech-to-text:    Whisper (Wyoming add-on)
+#        Text-to-speech:    Piper  (Wyoming add-on)
+#        Wake word:         openWakeWord ("hey jarvis" or custom)
+
+# ───────── System prompt (paste into the integration's Prompt Template field) ─────────
+# You are "Casa", the voice of this smart home. You are concise, friendly,
+# and never invent devices that don't exist. The current time is {{ now() }}.
+#
+# Available entities you can control:
+# {% for s in states -%}
+# - {{ s.entity_id }} ({{ s.name }}) — state: {{ s.state }}
+# {% endfor %}
+#
+# Rules:
+# - If the user asks to control something, call the appropriate HA service
+#   via the execute_services tool with the matching entity_id.
+# - For questions about sensors, read the state and answer in one sentence.
+# - If you don't know, say so. Do not make up entity_ids.
+# - Replies should fit in one or two spoken sentences unless asked for more.
+
+# ───────── Example automation: pipeline triggered by the doorbell ─────────
+automation:
+  - alias: "Voice: announce who is at the door"
+    description: When Frigate detects a person at the doorbell, ask the LLM to compose a spoken announcement.
+    mode: single
+    trigger:
+      - platform: mqtt
+        topic: frigate/events
+    condition:
+      - condition: template
+        value_template: >-
+          {{ trigger.payload_json['type'] == 'new'
+             and trigger.payload_json['after']['camera'] == 'doorbell'
+             and trigger.payload_json['after']['label'] == 'person' }}
+    action:
+      - service: conversation.process
+        data:
+          agent_id: conversation.extended_openai_conversation
+          text: >-
+            A person was just detected at the front door
+            ({{ (trigger.payload_json['after']['score'] * 100) | round(0) }}%
+            confidence). Compose a single short sentence to announce this on
+            the living room speaker, including the time of day.
+        response_variable: llm
+      - service: tts.speak
+        target:
+          entity_id: tts.piper
+        data:
+          media_player_entity_id: media_player.living_room
+          message: "{{ llm.response.speech.plain.speech }}"
+
+# ───────── Optional helper: a "Ask Casa" script you can trigger from the UI ─────────
+script:
+  ask_casa:
+    alias: "Ask Casa"
+    fields:
+      question:
+        description: "What to ask the local LLM"
+        example: "Turn off all the lights downstairs"
+    sequence:
+      - service: conversation.process
+        data:
+          agent_id: conversation.extended_openai_conversation
+          text: "{{ question }}"
