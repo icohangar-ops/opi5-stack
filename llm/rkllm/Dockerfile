@@ -22,7 +22,8 @@ ENV PYTHONPATH=/opt/rknn-llm/rkllm-toolkit/examples/rkllm_server
 # --- API shim --------------------------------------------------------------
 WORKDIR /app
 RUN pip3 install --no-cache-dir fastapi==0.115.* uvicorn[standard]==0.30.* \
-                                pydantic==2.* sse-starlette==2.*
+                                pydantic==2.* sse-starlette==2.* \
+                                "cubiczan-resilience[fastapi] @ git+https://github.com/icohangar-ops/cubiczan-resilience.git#subdirectory=python"
 
 COPY server.py /app/server.py
 EXPOSE 8080

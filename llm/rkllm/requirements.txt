@@ -1,0 +1,6 @@
+# RKLLM OpenAI-shim server dependencies (kept in sync with the Dockerfile).
+fastapi==0.115.*
+uvicorn[standard]==0.30.*
+pydantic==2.*
+sse-starlette==2.*
+cubiczan-resilience[fastapi] @ git+https://github.com/icohangar-ops/cubiczan-resilience.git#subdirectory=python

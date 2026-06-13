@@ -8,6 +8,7 @@ Tip: spread two streams across two NPU cores by launching twice with
 """
 from __future__ import annotations
 import argparse
+import sys
 import time
 import cv2
 
@@ -21,6 +22,33 @@ CORE_MAP = {
     -1: RKNNEngine.NPU_CORE_0_1_2,
 }
 
+# Reconnect backoff: 1s, 2s, 4s ... capped at this many seconds.
+RECONNECT_BASE = 1.0
+RECONNECT_CAP = 30.0
+
+
+def _log(event: str, msg: str) -> None:
+    """Structured stderr log so operators can detect outages without attaching."""
+    ts = time.strftime("%Y-%m-%dT%H:%M:%S%z")
+    print(f"{ts} [{event}] {msg}", file=sys.stderr, flush=True)
+
+
+def _open_stream(src: str) -> "cv2.VideoCapture":
+    """Open a capture with exponential backoff until it succeeds."""
+    delay = RECONNECT_BASE
+    attempt = 0
+    while True:
+        cap = cv2.VideoCapture(src)
+        if cap.isOpened():
+            if attempt:
+                _log("stream_reconnect", f"reconnected to {src} after {attempt} attempt(s)")
+            return cap
+        cap.release()
+        attempt += 1
+        _log("stream_error", f"could not open {src}; retry in {delay:.0f}s (attempt {attempt})")
+        time.sleep(delay)
+        delay = min(delay * 2, RECONNECT_CAP)
+
 
 def main():
     ap = argparse.ArgumentParser()
@@ -31,9 +59,7 @@ def main():
     ap.add_argument("--show",  action="store_true")
     args = ap.parse_args()
 
-    cap = cv2.VideoCapture(args.src)
-    if not cap.isOpened():
-        raise SystemExit(f"Could not open {args.src}")
+    cap = _open_stream(args.src)
 
     with RKNNEngine(args.model, core_mask=CORE_MAP[args.core]) as eng:
         t_log = time.perf_counter()
@@ -41,7 +67,12 @@ def main():
         while True:
             ok, frame = cap.read()
             if not ok:
-                break
+                # Stream dropped: release, back off, and reopen. Keeps a
+                # long-running camera feed self-healing across RTSP hiccups.
+                _log("stream_error", f"read() failed on {args.src}; reconnecting")
+                cap.release()
+                cap = _open_stream(args.src)
+                continue
             lb, r, pad = letterbox(frame, (args.size, args.size))
             nhwc = cv2.cvtColor(lb, cv2.COLOR_BGR2RGB)[None, ...]
             outs = eng.infer(nhwc)
