@@ -17,12 +17,11 @@ opi5-stack/llm/
 ├── rkllm/              # NPU server (rkllm-server in Docker)
 │   ├── docker-compose.yml
 │   ├── Dockerfile
-│   ├── server.py       # FastAPI wrapper → OpenAI shim
+│   ├── requirements.txt
+│   ├── server.py       # FastAPI OpenAI-compatible shim over RKLLM
 │   └── models/         # drop Qwen2.5-3B.rkllm here
-├── ollama/             # CPU fallback
-│   └── docker-compose.yml
-└── openai-shim/        # Shared OpenAI → backend adapter (used by rkllm)
-    └── README.md
+└── ollama/             # CPU fallback
+    └── docker-compose.yml
 ```
 
 ## Quick start — Ollama (5 minutes)
@@ -54,7 +53,11 @@ curl http://localhost:11434/v1/chat/completions \
 1. Install **Extended OpenAI Conversation** via HACS (preferred — supports tool calling).
 2. Settings → Devices → Add Integration → *Extended OpenAI Conversation*.
 3. Config:
-   - **API key**: `not-needed` (local server doesn't auth)
+   - **API key**:
+     - Ollama: `not-needed` (Ollama does not authenticate by default)
+     - RKLLM: the value of `RKLLM_API_KEY` set on the `rkllm` service. The shim
+       is fail-closed — if `RKLLM_API_KEY` is unset/empty every request is
+       rejected, so set it in the environment and use the same value here.
    - **Base URL**:
      - Ollama: `http://<pi-ip>:11434/v1`
      - RKLLM: `http://<pi-ip>:8080/v1`
