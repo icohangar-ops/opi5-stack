@@ -12,7 +12,12 @@ services:
       - ./server.py:/app/server.py:ro
     ports:
       - "8080:8080"
+    env_file: .env
     environment:
+      # Fail-closed bearer token for the OpenAI-compatible shim. Must be set
+      # (see .env.example) or every request is rejected. Use the same value as
+      # the API key configured in Home Assistant.
+      RKLLM_API_KEY: "${RKLLM_API_KEY}"
       RKLLM_MODEL: /models/qwen2.5-3b.rkllm
       RKLLM_MODEL_NAME: qwen2.5-3b
       # NPU core mask: 7 = all three cores (0b111). Use 1, 2, 4 to pin a single core.

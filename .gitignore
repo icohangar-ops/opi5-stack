@@ -2,7 +2,8 @@
 .env
 *.env
 .env.*
-!/.env.example
+!.env.example
+!**/.env.example
 
 # Model weights / binaries
 *.rknn
@@ -30,6 +31,7 @@ frigate/media/
 homeassistant/config/.storage/
 homeassistant/config/home-assistant.log
 homeassistant/config/home-assistant_v2.db*
+secrets.yaml
 mosquitto/data/
 mosquitto/log/
 
